@@ -74,15 +74,7 @@ void loop()
     byte prevVolume = volume;
     volume = (double)analogRead(volumePin) * 127.0 / 1023.0;
     if (volume != prevVolume)
-    {
-        byte channel = 4;
-        byte controlChange = 0xB0 | channel;
-        byte channelVolume = 0x07;
-
-        Serial.write(controlChange);
-        Serial.write(channelVolume);
-        Serial.write(volume);
-    }
+        outputMidi(0xB0, 4, 0x07, volume);
 
     latchInputs();
     unsigned long now = millis();
@@ -100,7 +92,10 @@ void loop()
                 stableTime >= debounceThreshold)
             {
                 reported[note] = keyState;
-                outputMidi(note, keyState);
+                if (keyState)
+                    outputMidi(0x80, channels[note], pitches[note], 0);
+                else
+                    outputMidi(0x90, channels[note], pitches[note], 0x7f);
             }
 
             if (keyState != detected[note])
@@ -112,26 +107,16 @@ void loop()
     }
 }
 
-void outputMidi(int key, boolean up)
+void outputMidi(byte command, byte channel, byte data2, byte data3)
 {
-    byte channel = channels[key];
-
     if (!channel)
         return;
 
-    byte pitch = pitches[key];
-    byte velocity = 0x7f;
+    byte data1 = command | (channel - 1);
 
-    byte command = 0x90 | (channel - 1);
-    if (up)
-    {
-        command = 0x80 | (channel - 1);
-        velocity = 0;
-    }
-        
-    Serial.write(command);
-    Serial.write(pitch);
-    Serial.write(velocity);
+    Serial.write(data1);
+    Serial.write(data2);
+    Serial.write(data3);
 }
 
 void latchInputs()
